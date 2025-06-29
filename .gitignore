@@ -63,3 +63,4 @@ Thumbs.db
 /ml-service/.env*
 /ml-service/data/
 ml_service/models/
+
