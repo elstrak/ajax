@@ -36,6 +36,7 @@ export interface IVulnerability {
   lineNumber?: number;
   code?: string;
   category: string;
+  recommendation?: string;
 }
 
 export interface IBlockchainAnalytics {
@@ -75,7 +76,8 @@ const VulnerabilitySchema = new Schema<IVulnerability>({
   },
   lineNumber: { type: Number },
   code: { type: String },
-  category: { type: String, required: true }
+  category: { type: String, required: true },
+  recommendation: { type: String }
 });
 
 const BlockchainTransactionSchema = new Schema({

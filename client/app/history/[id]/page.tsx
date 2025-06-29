@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Code, Download, ExternalLinkIcon, FileText, Share2 } from "lucide-react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,9 +11,72 @@ import { Badge } from "@/components/ui/badge"
 import { SessionNavBar } from "@/components/session-nav-bar"
 import { Separator } from "@/components/ui/separator"
 
+interface VulnerabilityDetail {
+  name: string;
+  type: string;
+  severity: string;
+  lines: string;
+  description: string;
+  code: string;
+}
+
+interface Analysis {
+  id: string;
+  name: string;
+  address: string;
+  date: string;
+  rating: number;
+  vulnerabilities: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  network: string;
+  vulnerabilityDetails: VulnerabilityDetail[];
+}
+
 export default function HistoryDetailPage({ params }: { params: { id: string } }) {
-  // В реальном приложении здесь был бы запрос к API или базе данных
-  const analysis = getAnalysisById(params.id)
+  const { id } = params
+  const [analysis, setAnalysis] = useState<Analysis | null>(null)
+
+  useEffect(() => {
+    async function fetchAnalysis() {
+      const res = await fetch(`/api/history/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+
+        // Преобразуем данные из API к нужному формату
+        const analysis: Analysis = {
+          id: data._id, // или data._id.$oid если приходит так
+          name: "VulnerableBank.sol", // или другое имя, если есть
+          address: "", // если есть адрес, иначе пусто
+          date: new Date(data.createdAt).toLocaleString("ru-RU"), // или другой формат
+          rating: (data.securityScore ?? 0) / 10, // если securityScore 55, то 5.5
+          vulnerabilities: {
+            critical: data.vulnerabilities.filter(v => v.severity === "critical").length,
+            high: data.vulnerabilities.filter(v => v.severity === "high").length,
+            medium: data.vulnerabilities.filter(v => v.severity === "medium").length,
+            low: data.vulnerabilities.filter(v => v.severity === "low").length,
+          },
+          network: data.network,
+          vulnerabilityDetails: data.vulnerabilities.map(v => ({
+            name: v.name,
+            type: v.category,
+            severity: mapSeverity(v.severity), // функция для перевода "critical" → "Критическая"
+            lines: "", // если есть информация о строках, иначе пусто
+            description: v.description,
+            code: "", // если есть пример кода, иначе пусто
+          })),
+        };
+
+        setAnalysis(analysis);
+      } else {
+        setAnalysis(null);
+      }
+    }
+    fetchAnalysis();
+  }, [id]);
 
   if (!analysis) {
     return (
@@ -583,6 +647,21 @@ someExternalContract.call(data);
       network: "Ethereum",
       vulnerabilityDetails: [],
     },
+    {
+      id: "686175335a5a89dcafaad645",
+      name: "Test Report",
+      address: "0x123...",
+      date: "01 янв 2024, 00:00",
+      rating: 7.5,
+      vulnerabilities: {
+        critical: 0,
+        high: 1,
+        medium: 0,
+        low: 0,
+      },
+      network: "Ethereum",
+      vulnerabilityDetails: [],
+    },
   ]
 
   return analyses.find((a) => a.id === id)
@@ -635,4 +714,15 @@ function getRatingCircleColor(rating) {
   if (rating >= 5) return "#EAB308" // yellow-500
   if (rating >= 3) return "#FA8603" // atomic
   return "#BB2233" // demonic
+}
+
+// Функция для перевода severities
+function mapSeverity(severity: string): string {
+  switch (severity) {
+    case "critical": return "Критическая";
+    case "high": return "Высокая";
+    case "medium": return "Средняя";
+    case "low": return "Низкая";
+    default: return severity;
+  }
 }

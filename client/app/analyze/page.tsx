@@ -13,20 +13,66 @@ import { SessionNavBar } from "@/components/session-nav-bar"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import historyService from "@/services/api/historyService"
 
 export default function AnalyzePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [activeTab, setActiveTab] = useState("upload")
+  const [code, setCode] = useState("")
+  const [analysis, setAnalysis] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleAnalyze = () => {
+  // ВЫЧИСЛЯЕМ СТАТИСТИКУ
+  const vulnerabilities = analysis?.vulnerabilities || [];
+  const securityScore = typeof analysis?.securityScore === 'number'
+    ? analysis.securityScore
+    : calculateSecurityScore(vulnerabilities);
+  const criticalCount = vulnerabilities.filter((v: any) => normalizeSeverity(v.severity) === 'Критическая').length;
+  const highCount = vulnerabilities.filter((v: any) => normalizeSeverity(v.severity) === 'Высокая').length;
+  const mediumCount = vulnerabilities.filter((v: any) => normalizeSeverity(v.severity) === 'Средняя').length;
+  const lowCount = vulnerabilities.filter((v: any) => normalizeSeverity(v.severity) === 'Низкая').length;
+
+  const handleAnalyze = async () => {
     setIsAnalyzing(true)
-    // Имитация процесса анализа
-    setTimeout(() => {
-      setIsAnalyzing(false)
+    setError(null)
+    setShowResults(false)
+    setAnalysis(null)
+    try {
+      // Отправляем код на сервер (FastAPI backend)
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      })
+      if (!res.ok) throw new Error("Ошибка анализа: " + res.statusText)
+      const data = await res.json()
+      setAnalysis(data)
       setShowResults(true)
       setActiveTab("results")
-    }, 3000)
+
+      // Сохраняем отчет в историю
+      try {
+        await historyService.addScan({
+          sourceType: "code",
+          sourceContent: code,
+          fileName: data.fileName || undefined,
+          contractAddress: data.contractAddress || undefined,
+          network: data.network || "ethereum",
+          status: "completed",
+          securityScore: typeof data.securityScore === 'number' ? data.securityScore : calculateSecurityScore(data.vulnerabilities || []),
+          vulnerabilities: data.vulnerabilities || [],
+          blockchainAnalytics: data.blockchainAnalytics || undefined,
+        })
+      } catch (err) {
+        // Не блокируем UI, но логируем ошибку
+        console.error("Ошибка при сохранении отчета в историю:", err)
+      }
+    } catch (e: any) {
+      setError(e.message || "Ошибка анализа")
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   return (
@@ -43,6 +89,16 @@ export default function AnalyzePage() {
           </p>
         </header>
 
+        {error && <div className="mb-4 text-red-500">{error}</div>}
+
+        {/* ВЫЧИСЛЯЕМ СТАТИСТИКУ */}
+        {analysis && (
+          (() => {
+            // eslint-disable-next-line
+            (window as any)._debug_analysis = analysis;
+          })()
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
           <TabsList className="bg-firmament-light mb-6">
             <TabsTrigger value="upload" className="text-autumn data-[state=active]:bg-firmament-lighter">
@@ -53,7 +109,7 @@ export default function AnalyzePage() {
                 <TabsTrigger value="results" className="text-autumn data-[state=active]:bg-firmament-lighter">
                   Результаты
                 </TabsTrigger>
-                <TabsTrigger value="cfg" className="text-autumn data-[state=active]:bg-firmament-lighter">
+                {/* <TabsTrigger value="cfg" className="text-autumn data-[state=active]:bg-firmament-lighter">
                   Визуализация CFG
                 </TabsTrigger>
                 <TabsTrigger value="tests" className="text-autumn data-[state=active]:bg-firmament-lighter">
@@ -61,7 +117,7 @@ export default function AnalyzePage() {
                 </TabsTrigger>
                 <TabsTrigger value="blockchain" className="text-autumn data-[state=active]:bg-firmament-lighter">
                   Блокчейн-аналитика
-                </TabsTrigger>
+                </TabsTrigger> */}
               </>
             )}
           </TabsList>
@@ -99,12 +155,9 @@ export default function AnalyzePage() {
                 </CardHeader>
                 <CardContent>
                   <Textarea
-                    placeholder="// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-contract YourContract {
-    // Вставьте код здесь
-}"
+                    value={code}
+                    onChange={e => setCode(e.target.value)}
+                    placeholder={"// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract YourContract {\n    // Вставьте код здесь\n}"}
                     className="min-h-[200px] bg-firmament border-firmament-lighter text-autumn font-mono text-sm"
                   />
                 </CardContent>
@@ -143,7 +196,7 @@ contract YourContract {
             </Card>
 
             <div className="flex justify-end">
-              <Button className="bg-demonic hover:bg-demonic/90" onClick={handleAnalyze} disabled={isAnalyzing}>
+              <Button className="bg-demonic hover:bg-demonic/90" onClick={handleAnalyze} disabled={isAnalyzing || !code.trim()}>
                 {isAnalyzing ? (
                   <>
                     <div className="mr-2 size-4 animate-spin rounded-full border-2 border-autumn border-t-transparent"></div>
@@ -160,162 +213,133 @@ contract YourContract {
           </TabsContent>
 
           <TabsContent value="results" className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-3">
-              <Card className="bg-firmament-light border-firmament-lighter md:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <div>
-                    <CardTitle className="text-autumn">Результаты анализа</CardTitle>
-                    <CardDescription className="text-autumn-muted">
-                      Обнаружено 5 уязвимостей в TokenSwap.sol
-                    </CardDescription>
-                  </div>
-                  <Button variant="outline" className="border-firmament-lighter text-autumn">
-                    <Download className="mr-2 size-4" />
-                    Скачать отчет
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border border-firmament-lighter overflow-hidden">
-                    <table className="w-full text-autumn">
-                      <thead>
-                        <tr className="bg-firmament-lighter">
-                          <th className="px-4 py-2 text-left">Тип</th>
-                          <th className="px-4 py-2 text-left">Строка</th>
-                          <th className="px-4 py-2 text-left">Серьезность</th>
-                          <th className="px-4 py-2 text-left">Описание</th>
-                          <th className="px-4 py-2 text-left">Действия</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-firmament-lighter">
-                        {vulnerabilities.map((vuln, index) => (
-                          <tr key={index} className="hover:bg-firmament">
-                            <td className="px-4 py-3">{vuln.type}</td>
-                            <td className="px-4 py-3">{vuln.line}</td>
-                            <td className="px-4 py-3">
-                              <Badge className={getSeverityColor(vuln.severity)}>{vuln.severity}</Badge>
-                            </td>
-                            <td className="px-4 py-3">{vuln.description}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex gap-2">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="size-8">
-                                        <Info className="size-4 text-autumn" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-firmament-light border-firmament-lighter text-autumn">
-                                      <p>Подробнее</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="size-8">
-                                        <Code className="size-4 text-autumn" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-firmament-light border-firmament-lighter text-autumn">
-                                      <p>Исправление</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            </td>
+            {analysis ? (
+              <div className="grid gap-6 md:grid-cols-3">
+                <Card className="bg-firmament-light border-firmament-lighter md:col-span-2">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <div>
+                      <CardTitle className="text-autumn">Результаты анализа</CardTitle>
+                      <CardDescription className="text-autumn-muted">
+                        Обнаружено {analysis.vulnerabilities.length} уязвимостей
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border border-firmament-lighter overflow-hidden">
+                      <table className="w-full text-autumn">
+                        <thead>
+                          <tr className="bg-firmament-lighter">
+                            <th className="px-4 py-2 text-left">Тип</th>
+                            <th className="px-4 py-2 text-left">Серьезность</th>
+                            <th className="px-4 py-2 text-left">Описание</th>
+                            <th className="px-4 py-2 text-left">Рекомендация</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-6">
-                <Card className="bg-firmament-light border-firmament-lighter">
-                  <CardHeader>
-                    <CardTitle className="text-autumn">Рейтинг безопасности</CardTitle>
-                    <CardDescription className="text-autumn-muted">Оценка безопасности контракта</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center justify-center">
-                    <div className="relative flex items-center justify-center mb-4">
-                      <div className="absolute text-4xl font-bold text-autumn">4.2</div>
-                      <svg className="size-40" viewBox="0 0 100 100">
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="45"
-                          fill="none"
-                          stroke="#1A1F38"
-                          strokeWidth="10"
-                          strokeLinecap="round"
-                        />
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="45"
-                          fill="none"
-                          stroke="#BB2233"
-                          strokeWidth="10"
-                          strokeLinecap="round"
-                          strokeDasharray="282.7"
-                          strokeDashoffset="164"
-                          transform="rotate(-90 50 50)"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-autumn-muted text-sm mb-4">из 10 возможных</p>
-                    <div className="w-full space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-autumn">Критические проблемы</span>
-                        <span className="text-demonic">2</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-autumn">Высокие риски</span>
-                        <span className="text-atomic">1</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-autumn">Средние риски</span>
-                        <span className="text-yellow-500">2</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-autumn">Низкие риски</span>
-                        <span className="text-green-500">0</span>
-                      </div>
+                        </thead>
+                        <tbody className="divide-y divide-firmament-lighter">
+                          {analysis.vulnerabilities.map((vuln: any, index: number) => (
+                            <tr key={index} className="hover:bg-firmament">
+                              <td className="px-4 py-3">{vuln.name}</td>
+                              <td className="px-4 py-3">
+                                <Badge>{vuln.severity}</Badge>
+                              </td>
+                              <td className="px-4 py-3">{vuln.description}</td>
+                              <td className="px-4 py-3">{vuln.recommendation}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-firmament-light border-firmament-lighter">
-                  <CardHeader>
-                    <CardTitle className="text-autumn">Похожие инциденты</CardTitle>
-                    <CardDescription className="text-autumn-muted">Сравнение с известными хаками</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-start gap-3 p-3 rounded-md bg-firmament">
-                      <AlertTriangle className="size-5 text-demonic shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-autumn font-medium">DAO Hack (2016)</p>
-                        <p className="text-autumn-muted text-sm">Сходство: 85%</p>
-                        <p className="text-autumn-muted text-sm mt-1">
-                          Уязвимость повторного входа, приведшая к потере $60 млн
-                        </p>
+                <div className="space-y-6">
+                  <Card className="bg-firmament-light border-firmament-lighter">
+                    <CardHeader>
+                      <CardTitle className="text-autumn">Рейтинг безопасности</CardTitle>
+                      <CardDescription className="text-autumn-muted">Оценка безопасности контракта</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center justify-center">
+                      <div className="relative flex items-center justify-center mb-4">
+                        <div className="absolute text-4xl font-bold text-autumn">{(securityScore / 10).toFixed(1)}</div>
+                        <svg className="size-40" viewBox="0 0 100 100">
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="45"
+                            fill="none"
+                            stroke="#1A1F38"
+                            strokeWidth="10"
+                            strokeLinecap="round"
+                          />
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="45"
+                            fill="none"
+                            stroke="#BB2233"
+                            strokeWidth="10"
+                            strokeLinecap="round"
+                            strokeDasharray="282.7"
+                            strokeDashoffset={282.7 - (282.7 * (securityScore / 100))}
+                            transform="rotate(-90 50 50)"
+                          />
+                        </svg>
                       </div>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 rounded-md bg-firmament">
-                      <AlertTriangle className="size-5 text-atomic shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-autumn font-medium">Parity Multisig (2017)</p>
-                        <p className="text-autumn-muted text-sm">Сходство: 42%</p>
-                        <p className="text-autumn-muted text-sm mt-1">
-                          Проблема с инициализацией библиотеки, заморозившая $300 млн
-                        </p>
+                      <p className="text-autumn-muted text-sm mb-4">из 10 возможных</p>
+                      <div className="w-full space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-autumn">Критические проблемы</span>
+                          <span className="text-demonic">{criticalCount}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-autumn">Высокие риски</span>
+                          <span className="text-atomic">{highCount}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-autumn">Средние риски</span>
+                          <span className="text-yellow-500">{mediumCount}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-autumn">Низкие риски</span>
+                          <span className="text-green-500">{lowCount}</span>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+
+                  {/* <Card className="bg-firmament-light border-firmament-lighter">
+                    <CardHeader>
+                      <CardTitle className="text-autumn">Похожие инциденты</CardTitle>
+                      <CardDescription className="text-autumn-muted">Сравнение с известными хаками</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-start gap-3 p-3 rounded-md bg-firmament">
+                        <AlertTriangle className="size-5 text-demonic shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-autumn font-medium">DAO Hack (2016)</p>
+                          <p className="text-autumn-muted text-sm">Сходство: 85%</p>
+                          <p className="text-autumn-muted text-sm mt-1">
+                            Уязвимость повторного входа, приведшая к потере $60 млн
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 rounded-md bg-firmament">
+                        <AlertTriangle className="size-5 text-atomic shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-autumn font-medium">Parity Multisig (2017)</p>
+                          <p className="text-autumn-muted text-sm">Сходство: 42%</p>
+                          <p className="text-autumn-muted text-sm mt-1">
+                            Проблема с инициализацией библиотеки, заморозившая $300 млн
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card> */}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-autumn-muted">Нет данных анализа</div>
+            )}
           </TabsContent>
 
           <TabsContent value="cfg" className="space-y-6">
@@ -666,23 +690,45 @@ const vulnerabilities = [
   },
 ]
 
-// Вспомогательная функция для цветов серьезности
-function getSeverityColor(severity) {
-  switch (severity) {
-    case "Критическая":
-      return "bg-demonic/20 text-demonic border-demonic/30"
-    case "Высокая":
-      return "bg-atomic/20 text-atomic border-atomic/30"
-    case "Средняя":
-      return "bg-yellow-500/20 text-yellow-500 border-yellow-500/30"
-    case "Низкая":
-      return "bg-green-500/20 text-green-500 border-green-500/30"
+// Вспомогательная функция для нормализации серьезности
+function normalizeSeverity(severity: string) {
+  switch (severity?.toLowerCase()) {
+    case 'critical':
+    case 'критическая':
+      return 'Критическая';
+    case 'high':
+    case 'высокая':
+      return 'Высокая';
+    case 'medium':
+    case 'средняя':
+      return 'Средняя';
+    case 'low':
+    case 'низкая':
+      return 'Низкая';
     default:
-      return "bg-autumn/20 text-autumn border-autumn/30"
+      return 'Другая';
   }
 }
 
-function ExternalLink(props) {
+// Функция для расчета рейтинга безопасности на клиенте
+function calculateSecurityScore(vulnerabilities: any[]): number {
+  if (!vulnerabilities || vulnerabilities.length === 0) return 100;
+  const severityWeights: Record<string, number> = {
+    'Критическая': 20,
+    'Высокая': 15,
+    'Средняя': 10,
+    'Низкая': 5,
+    'Другая': 2
+  };
+  let totalDeduction = 0;
+  vulnerabilities.forEach((v: any) => {
+    const sev = normalizeSeverity(v.severity);
+    totalDeduction += severityWeights[sev] || 10;
+  });
+  return Math.max(0, 100 - totalDeduction);
+}
+
+function ExternalLink(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}

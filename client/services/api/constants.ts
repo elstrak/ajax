@@ -1,5 +1,5 @@
 // API Base URL
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 // Cookie names
 export const TOKEN_COOKIE_NAME = 'auth_token';
@@ -9,42 +9,48 @@ export const USER_COOKIE_NAME = 'user_data';
 export const API_ENDPOINTS = {
   // Auth endpoints
   AUTH: {
-    LOGIN: '/auth/login',
-    REGISTER: '/auth/register',
-    ME: '/auth/me',
+    LOGIN: '/api/auth/login',
+    REGISTER: '/api/auth/register',
+    ME: '/api/auth/me',
   },
   
   // Dashboard endpoints
   DASHBOARD: {
-    STATS: '/dashboard/stats',
-    RECENT_SCANS: '/dashboard/recent-scans',
-    TOP_VULNERABILITIES: '/dashboard/top-vulnerabilities',
+    STATS: '/api/dashboard/stats',
+    RECENT_SCANS: '/api/dashboard/recent-scans',
+    TOP_VULNERABILITIES: '/api/dashboard/top-vulnerabilities',
   },
   
   // Analyze endpoints
   ANALYZE: {
-    CODE: '/analyze/code',
-    FILE: '/analyze/file',
-    CONTRACT: '/analyze/contract',
-    RESULTS: (scanId: string) => `/analyze/results/${scanId}`,
-    BLOCKCHAIN: (address: string) => `/analyze/blockchain/${address}`,
+    CODE: '/api/analyze/code',
+    FILE: '/api/analyze/file',
+    CONTRACT: '/api/analyze/contract',
+    RESULTS: (scanId: string) => `/api/analyze/results/${scanId}`,
+    BLOCKCHAIN: (address: string) => `/api/analyze/blockchain/${address}`,
   },
   
   // History endpoints
   HISTORY: {
     LIST: '/api/history',
-    DETAILS: (scanId: string) => `/history/${scanId}`,
-    DOWNLOAD: (scanId: string) => `/history/${scanId}/download`,
+    DETAILS: (scanId: string) => `/api/history/${scanId}`,
+    DOWNLOAD: (scanId: string) => `/api/history/${scanId}/download`,
     DELETE: (id: string) => `/api/history/${id}`,
     STATS: '/api/history/stats'
   },
   
   // Knowledge endpoints
   KNOWLEDGE: {
-    VULNERABILITIES: '/knowledge/vulnerabilities',
-    VULNERABILITY: (id: string) => `/knowledge/vulnerabilities/${id}`,
-    CATEGORIES: '/knowledge/categories',
-    SEVERITY: '/knowledge/severity',
+    VULNERABILITIES: '/api/knowledge/vulnerabilities',
+    VULNERABILITY: (id: string) => `/api/knowledge/vulnerabilities/${id}`,
+    CATEGORIES: '/api/knowledge/categories',
+    SEVERITY: '/api/knowledge/severity',
+  },
+  
+  // Profile endpoints
+  PROFILE: {
+    BASE: '/api/profile',
+    CONTRIBUTIONS: '/api/profile/contributions',
   },
 };
 

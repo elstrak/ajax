@@ -4,6 +4,7 @@ export { default as dashboardService } from './dashboardService';
 export { default as analyzeService } from './analyzeService';
 export { default as historyService } from './historyService';
 export { default as knowledgeService } from './knowledgeService';
+export { default as profileService } from './profileService';
 
 // Export API client for direct use if needed
 export { default as apiClient, get, post, put, del } from './apiClient';

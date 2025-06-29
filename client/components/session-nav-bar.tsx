@@ -175,7 +175,7 @@ export function SessionNavBar() {
                       <motion.li variants={variants} className="flex w-fit items-center gap-2">
                         {!isCollapsed && (
                           <>
-                            <p className="text-sm font-medium">{"DeepGuard"}</p>
+                            <p className="text-sm font-medium">{"Ajax"}</p>
                             <ChevronsUpDown className="h-4 w-4 text-autumn/50" />
                           </>
                         )}
@@ -327,7 +327,7 @@ export function SessionNavBar() {
                     >
                       <Zap className="h-4 w-4" />
                       <motion.li variants={variants}>
-                        {!isCollapsed && <p className="ml-2 text-sm font-medium">Contribute</p>}
+                        {!isCollapsed && <p className="ml-2 text-sm font-medium">Вклад</p>}
                       </motion.li>
                     </Link>
                   </div>

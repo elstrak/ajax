@@ -347,7 +347,6 @@ export default function HistoryPage() {
                         <th className="px-4 py-2 text-left">Дата анализа</th>
                         <th className="px-4 py-2 text-left">Рейтинг</th>
                         <th className="px-4 py-2 text-left">Уязвимости</th>
-                        <th className="px-4 py-2 text-left">Сеть</th>
                         <th className="px-4 py-2 text-left">Действия</th>
                       </tr>
                     </thead>
@@ -364,7 +363,7 @@ export default function HistoryPage() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col">
-                                <span className="font-medium">{scan.fileName || 'Безымянный контракт'}</span>
+                                <span className="font-medium">{scan.name || 'Безымянный контракт'}</span>
                                 <span className="text-autumn-muted text-xs truncate max-w-[200px]">
                                   {scan.contractAddress || 'Локальный файл'}
                                 </span>
@@ -421,11 +420,6 @@ export default function HistoryPage() {
                                     <span className="text-autumn-muted text-sm">Нет</span>
                                   )}
                               </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <Badge variant="outline" className="border-firmament-lighter text-autumn bg-transparent">
-                                {scan.network || 'Локальный'}
-                              </Badge>
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex gap-1">

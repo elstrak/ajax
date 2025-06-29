@@ -1,12 +1,13 @@
 // client/services/api/historyService.ts
 
 import { API_ENDPOINTS } from './constants';
-import { get, del } from './apiClient';
+import { get, del, post } from './apiClient';
 import { BlockchainNetwork, Vulnerability, VulnerabilitySeverity } from './analyzeService';
 
 // Интерфейсы для истории
 export interface HistoryScan {
   _id: string;
+  name: string;
   sourceType: string;
   fileName?: string;
   contractAddress?: string;
@@ -22,6 +23,8 @@ export interface HistoryScan {
   };
   createdAt: string;
   completedAt?: string;
+  sourceContent?: string;
+  blockchainAnalytics?: any;
 }
 
 export interface HistoryStats {
@@ -86,6 +89,11 @@ const historyService = {
   // Delete scan from history
   deleteScan: async (scanId: string): Promise<{ message: string }> => {
     return del<{ message: string }>(API_ENDPOINTS.HISTORY.DELETE(scanId));
+  },
+
+  // Add scan to history
+  addScan: async (scanData: Partial<HistoryScan> & { vulnerabilities: any[] }) => {
+    return post(API_ENDPOINTS.HISTORY.LIST, scanData);
   },
 };
 

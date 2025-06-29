@@ -12,6 +12,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import analyzeRoutes from './routes/analyze.routes';
 import historyRoutes from './routes/history.routes';
 import knowledgeRoutes from './routes/knowledge.routes';
+import profileRoutes from './routes/profile.routes';
 
 // Load environment variables
 dotenv.config();
@@ -52,6 +53,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analyze', analyzeRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -4,7 +4,9 @@ import {
   getScanHistory, 
   getScanDetails, 
   downloadScanReport, 
-  deleteScan 
+  deleteScan, 
+  getHistoryStats,
+  addScan
 } from '../controllers/history.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
@@ -13,8 +15,14 @@ const router = Router();
 // All history routes require authentication
 router.use(authMiddleware);
 
+// Get history stats
+router.get('/stats', getHistoryStats);
+
 // Get scan history
 router.get('/', getScanHistory);
+
+// Add scan to history
+router.post('/', addScan);
 
 // Get scan details
 router.get(

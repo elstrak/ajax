@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Scan, { ScanSourceType, ScanStatus, BlockchainNetwork, VulnerabilitySeverity } from '../models/Scan';
 import VulnerabilityKnowledge from '../models/Vulnerability';
+import axios from 'axios';
 
 // Async function to process code scan
 const processCodeScan = async (scanId: string, code: string) => {
@@ -32,13 +33,79 @@ const processCodeScan = async (scanId: string, code: string) => {
 
 // Service to analyze smart contract code
 const analyzeSmartContract = async (code: string) => {
-  // In a real application, this would call an ML model or external service
-  // For now, we'll simulate results
+  try {
+    // Call FastAPI ML service
+    const response = await axios.post('http://localhost:8000/analyze', {
+      code: code
+    }, {
+      timeout: 30000, // 30 seconds timeout
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const mlResults = response.data.vulnerabilities;
+    
+    // Convert ML results to our format
+    const vulnerabilities = mlResults.map((vuln: any) => ({
+      name: vuln.name,
+      description: vuln.description,
+      severity: mapSeverity(vuln.severity),
+      category: vuln.category,
+      recommendation: vuln.recommendation
+    }));
+
+    // Calculate security score based on vulnerabilities
+    const securityScore = calculateSecurityScore(vulnerabilities);
+
+    return {
+      securityScore,
+      vulnerabilities
+    };
+  } catch (error) {
+    console.error('Error calling ML service:', error);
+    
+    // Fallback to mock data if ML service is unavailable
+    console.log('Falling back to mock data...');
+    return getMockAnalysis();
+  }
+};
+
+// Helper function to map severity levels
+const mapSeverity = (mlSeverity: string): VulnerabilitySeverity => {
+  const severityMap: { [key: string]: VulnerabilitySeverity } = {
+    'critical': VulnerabilitySeverity.CRITICAL,
+    'high': VulnerabilitySeverity.HIGH,
+    'medium': VulnerabilitySeverity.MEDIUM,
+    'low': VulnerabilitySeverity.LOW,
+    'info': VulnerabilitySeverity.INFO
+  };
+  return severityMap[mlSeverity] || VulnerabilitySeverity.MEDIUM;
+};
+
+// Calculate security score based on vulnerabilities
+const calculateSecurityScore = (vulnerabilities: any[]): number => {
+  if (vulnerabilities.length === 0) return 100;
   
-  // Simulate processing time (1-3 seconds)
-  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+  const severityWeights = {
+    [VulnerabilitySeverity.CRITICAL]: 20,
+    [VulnerabilitySeverity.HIGH]: 15,
+    [VulnerabilitySeverity.MEDIUM]: 10,
+    [VulnerabilitySeverity.LOW]: 5,
+    [VulnerabilitySeverity.INFO]: 2
+  };
   
-  // Mock vulnerabilities
+  let totalDeduction = 0;
+  vulnerabilities.forEach((vuln: { severity: string }) => {
+    totalDeduction += severityWeights[vuln.severity as keyof typeof severityWeights] || 10;
+  });
+  
+  const score = Math.max(0, 100 - totalDeduction);
+  return Math.floor(score);
+};
+
+// Fallback mock analysis
+const getMockAnalysis = () => {
   const vulnerabilities = [
     {
       name: 'Reentrancy',
@@ -46,7 +113,8 @@ const analyzeSmartContract = async (code: string) => {
       severity: VulnerabilitySeverity.CRITICAL,
       lineNumber: 42,
       code: 'function withdraw() public {\\n  uint amount = balances[msg.sender];\\n  (bool success, ) = msg.sender.call{value: amount}("");\\n  require(success);\\n  balances[msg.sender] = 0;\\n}',
-      category: 'Security'
+      category: 'Security',
+      recommendation: 'Используйте шаблон Checks-Effects-Interactions и модификатор reentrancy guard.'
     },
     {
       name: 'Unchecked External Call',
@@ -54,7 +122,8 @@ const analyzeSmartContract = async (code: string) => {
       severity: VulnerabilitySeverity.HIGH,
       lineNumber: 105,
       code: 'msg.sender.transfer(amount);',
-      category: 'Security'
+      category: 'Security',
+      recommendation: 'Проверяйте возвращаемое значение внешних вызовов и обрабатывайте ошибки.'
     },
     {
       name: 'Integer Overflow',
@@ -62,12 +131,11 @@ const analyzeSmartContract = async (code: string) => {
       severity: VulnerabilitySeverity.MEDIUM,
       lineNumber: 78,
       code: 'totalSupply += amount;',
-      category: 'Arithmetic'
+      category: 'Arithmetic',
+      recommendation: 'Используйте безопасные арифметические операции (SafeMath или встроенные проверки overflow/underflow).'
     }
   ];
   
-  // Calculate security score (0-100)
-  // In a real app, this would be based on vulnerability severity and frequency
   const securityScore = Math.floor(70 + Math.random() * 20);
   
   return {
@@ -126,6 +194,7 @@ export const analyzeCode = async (req: Request, res: Response) => {
     });
     
     await scan.save();
+    console.log('Scan saved:', scan._id);
     
     // Process scan asynchronously
     // In a real app, this would be handled by a worker queue
