@@ -62,6 +62,6 @@ Thumbs.db
 /ml-service/.ipynb_checkpoints
 /ml-service/.env*
 /ml-service/data/
-ml_service/models/
+/ml_service/models/
 ml_service/data/
 
